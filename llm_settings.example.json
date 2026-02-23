@@ -1,0 +1,22 @@
+{
+  "providers": {
+    "openai": {
+      "api_type": "openai_official",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "",
+      "models": [
+        "gpt-5"
+      ]
+    },
+    "ollama-local": {
+      "api_type": "ollama_local",
+      "base_url": "http://host.docker.internal:11434/v1",
+      "api_key": "",
+      "models": [
+        "qwen2.5:32b"
+      ]
+    }
+  },
+  "default_provider": "ollama-local",
+  "default_model": "qwen2.5:32b"
+}

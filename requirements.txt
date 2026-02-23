@@ -1,0 +1,9 @@
+gradio
+pandas
+aiohttp
+pymupdf
+spacy
+openpyxl
+EbookLib
+beautifulsoup4
+reportlab

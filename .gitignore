@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.venv/
+venv/
+
+# Runtime outputs / logs
+cache_results.jsonl
+run_trace.log
+*.log
+typing_world.csv
+maimemo_vocabulary.txt
+vocabulary_reading.xlsx
+vocabulary_reading.pdf
+
+# User input and private docs
+input/
+*.pdf
+*.epub
+
+# Local model assets (optional download/build artifacts)
+en_core_web_sm/
+en_core_web_sm-*.dist-info/
+en_core_web_sm-*.whl
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets / local overrides
+.env
+.env.*
+!.env.example
+llm_settings.local.json

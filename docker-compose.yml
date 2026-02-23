@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    container_name: vocab-pipeline-app
+    restart: always
+    ports:
+      - "1016:7860"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: python app.py
