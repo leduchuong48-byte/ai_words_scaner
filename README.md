@@ -1,5 +1,7 @@
 # AI 生词检索器（words_scaner）
 
+[English](README_en.md)
+
 一个基于 `Gradio + spaCy + LLM` 的英文阅读词汇提取工具。
 
 - 支持从 `PDF / EPUB / TXT` 中提取候选词
@@ -104,6 +106,6 @@ docker compose up --build
 - 单文件超过 GitHub 限制时，改用 Git LFS 或外部对象存储
 - 持续保持 `README.md` 与实际功能一致
 
----
+## 9. 免责声明
 
-如果你要公开发布，建议补充：`LICENSE`、`CONTRIBUTING.md`、`SECURITY.md`。
+使用本项目即表示你已阅读并同意 [免责声明](DISCLAIMER.md)。
