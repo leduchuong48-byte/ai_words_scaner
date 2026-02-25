@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 from datetime import datetime
+from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -125,6 +126,15 @@ def map_extract_mode(label: str) -> str:
     return "both"
 
 
+def resolve_page_orientation(page_orientation: str, include_sentence: bool) -> str:
+    choice = (page_orientation or "").strip()
+    if choice == "竖向":
+        return "portrait"
+    if choice == "横向":
+        return "landscape"
+    return "landscape" if include_sentence else "portrait"
+
+
 def summarize_output_formats(selected_formats: List[str]) -> str:
     selected = selected_formats or []
     if not selected:
@@ -201,9 +211,13 @@ def load_results_dataframe(
 
 
 def _generate_pdf(
-    excel_df: pd.DataFrame, pdf_path: Path, include_sentence: bool, color_theme: str
+    excel_df: pd.DataFrame,
+    pdf_path: Path,
+    include_sentence: bool,
+    color_theme: str,
+    page_orientation: str,
 ) -> None:
-    """使用 ReportLab 生成 PDF（A4 横向，固定列宽，中文可读，强清洗）。"""
+    """使用 ReportLab 生成 PDF（A4，方向可配置，中文可读，强清洗）。"""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle
@@ -219,12 +233,13 @@ def _generate_pdf(
                 return ""
         except Exception:
             pass
-        text = str(value).strip().strip('"').strip("'")
-        text = text.replace("\\n", "<br/>")
-        text = (
-            text.replace("\r\n", "<br/>").replace("\n", "<br/>").replace("\r", "<br/>")
-        )
-        return text
+        text = str(value)
+        # 清理控制字符并转义 ReportLab 段落标记，避免生成异常或损坏内容流。
+        text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", text)
+        text = text.strip().strip('"').strip("'")
+        text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\\n", "\n")
+        text = escape(text, quote=False)
+        return text.replace("\n", "<br/>")
 
     pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
 
@@ -271,6 +286,16 @@ def _generate_pdf(
                 width = 0
             col_widths.append(width)
 
+    pdf_orientation = resolve_page_orientation(page_orientation, include_sentence)
+    pagesize = landscape(A4) if pdf_orientation == "landscape" else A4
+    left_margin = 18
+    right_margin = 18
+    available_width = pagesize[0] - left_margin - right_margin
+    total_width = sum(col_widths)
+    if total_width > 0 and total_width > available_width:
+        scale = available_width / total_width
+        col_widths = [round(w * scale, 2) for w in col_widths]
+
     # 构建表格数据
     data: List[List[Paragraph]] = []
     data.append(
@@ -282,11 +307,15 @@ def _generate_pdf(
             cleaned_row.append(Paragraph(_sanitize_pdf_text(cell), body_style))
         data.append(cleaned_row)
 
+    tmp_pdf_path = pdf_path.with_suffix(f"{pdf_path.suffix}.tmp")
+    if tmp_pdf_path.exists():
+        tmp_pdf_path.unlink()
+
     doc = SimpleDocTemplate(
-        str(pdf_path),
-        pagesize=landscape(A4),
-        leftMargin=18,
-        rightMargin=18,
+        str(tmp_pdf_path),
+        pagesize=pagesize,
+        leftMargin=left_margin,
+        rightMargin=right_margin,
         topMargin=18,
         bottomMargin=18,
     )
@@ -323,7 +352,12 @@ def _generate_pdf(
                 )
 
     table.setStyle(TableStyle(style_cmds))
-    doc.build([table])
+    try:
+        doc.build([table])
+        tmp_pdf_path.replace(pdf_path)
+    finally:
+        if tmp_pdf_path.exists():
+            tmp_pdf_path.unlink()
 
 
 def export_files(
@@ -333,6 +367,7 @@ def export_files(
     include_meaning: bool,
     include_sentence: bool,
     color_theme: str,
+    page_orientation: str,
     output_formats: List[str],
 ) -> List[str]:
     def _sanitize_excel_text(value: Any) -> Any:
@@ -375,9 +410,11 @@ def export_files(
         excel_df.to_excel(writer, sheet_name="Sheet1", index=False)
         ws = writer.sheets["Sheet1"]
 
-        # A4 打印适配：有“原句”用横向，否则用纵向
+        # A4 打印适配：支持自动/竖向/横向切换
         ws.page_setup.paperSize = 9  # A4
-        ws.page_setup.orientation = "landscape" if include_sentence else "portrait"
+        ws.page_setup.orientation = resolve_page_orientation(
+            page_orientation, include_sentence
+        )
         ws.page_setup.fitToWidth = 1
         ws.page_setup.fitToHeight = 0
         ws.page_margins = PageMargins(left=0.75, right=0.75, top=0.75, bottom=0.75)
@@ -451,10 +488,16 @@ def export_files(
                 pdf_path,
                 include_sentence=include_sentence,
                 color_theme=color_theme,
+                page_orientation=page_orientation,
             )
             output_files.append(str(pdf_path.resolve()))
         except Exception as exc:
             print(f"[Warning] PDF 生成失败，已跳过，仅保留 Excel: {exc}")
+            if pdf_path.exists():
+                try:
+                    pdf_path.unlink()
+                except OSError:
+                    pass
             if str(reading_excel.resolve()) not in output_files:
                 output_files.append(str(reading_excel.resolve()))
 
@@ -486,6 +529,7 @@ async def process_pipeline(
     include_meaning: bool,
     include_sentence: bool,
     color_theme: str,
+    page_orientation: str,
     output_formats: List[str],
     filter_strategy_label: str,
     pdf_file: str,
@@ -536,7 +580,7 @@ async def process_pipeline(
         extract_mode = map_extract_mode(extract_mode_label)
         yield (
             push(
-                f"开始任务，使用配置={provider_name}:{model_name}，最低等级={int(min_level)}，提取模式={extract_mode_label}"
+                f"开始任务，使用配置={provider_name}:{model_name}，最低等级={int(min_level)}，提取模式={extract_mode_label}，页面方向={page_orientation}"
             ),
             [],
         )
@@ -699,6 +743,7 @@ async def process_pipeline(
             include_meaning=include_meaning,
             include_sentence=include_sentence,
             color_theme=color_theme,
+            page_orientation=page_orientation,
             output_formats=output_formats,
         )
         yield push("导出完成，可下载结果文件。"), output_paths
@@ -865,6 +910,11 @@ with gr.Blocks(title="Vocabulary Pipeline") as demo:
                         label="🎨 排版主题",
                         value="黑白公文 (打印专用)",
                     )
+                    page_orientation = gr.Radio(
+                        ["自动 (有原句则横向)", "竖向", "横向"],
+                        label="🧭 页面方向",
+                        value="自动 (有原句则横向)",
+                    )
                     output_formats = gr.CheckboxGroup(
                         ["Excel (.xlsx)", "PDF (.pdf)", "TXT 单词本 (适配墨墨/欧路)"],
                         label="💾 导出格式",
@@ -910,6 +960,7 @@ with gr.Blocks(title="Vocabulary Pipeline") as demo:
                     include_meaning,
                     include_sentence,
                     color_theme,
+                    page_orientation,
                     output_formats,
                     filter_strategy_choice,
                     pdf_file,
