@@ -1,0 +1,1 @@
+⚡ Lightweight Self-hosted NAS vocab scanner for PDF/EPUB/TXT with LLM meanings & export. 🚀

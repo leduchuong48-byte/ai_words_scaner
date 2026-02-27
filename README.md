@@ -1,111 +1,116 @@
-# AI 生词检索器（words_scaner）
+# AI 生词检索器（ai_words_scaner）
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/leduchuong/ai_words_scaner?logo=docker&style=flat-square)](https://hub.docker.com/r/leduchuong/ai_words_scaner)
+[![Docker Stars](https://img.shields.io/docker/stars/leduchuong/ai_words_scaner?logo=docker&style=flat-square)](https://hub.docker.com/r/leduchuong/ai_words_scaner)
+[![GitHub Stars](https://img.shields.io/github/stars/leduchuong48-byte/ai_words_scaner?style=flat-square)](https://github.com/leduchuong48-byte/ai_words_scaner/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/leduchuong48-byte/ai_words_scaner?style=flat-square)](https://github.com/leduchuong48-byte/ai_words_scaner/network/members)
+[![GitHub Issues](https://img.shields.io/github/issues/leduchuong48-byte/ai_words_scaner?style=flat-square)](https://github.com/leduchuong48-byte/ai_words_scaner/issues)
+[![License](https://img.shields.io/github/license/leduchuong48-byte/ai_words_scaner?style=flat-square)](https://github.com/leduchuong48-byte/ai_words_scaner/blob/main/LICENSE)
 
 [English](README_en.md)
 
-一个基于 `Gradio + spaCy + LLM` 的英文阅读词汇提取工具。
+面向英文阅读场景的 AI 生词流水线：上传 `PDF/EPUB/TXT`，自动提取候选词，结合 LLM 生成语境释义与固定搭配，并导出可直接用于背词与复盘的结果文件。
 
-- 支持从 `PDF / EPUB / TXT` 中提取候选词
-- 支持两种过滤策略：专业阅读模式（黑名单）与雅思备考模式（白名单）
-- 支持调用兼容 OpenAI / Ollama / Gemini 的模型做语境释义与搭配补全
-- 支持导出 `Excel / PDF / TXT`（按你在界面中选择）
+## 为什么做它
 
-## 1. 运行环境
+传统“查词 + 记词”流程最大的痛点是碎片化：提词、去噪、释义、搭配、导出都在不同工具里来回切换。`ai_words_scaner` 把这条链路收敛到一个 WebUI 里，目标是让你从“读到不认识”到“得到可复习词表”只走一条可重复的流程。
 
-- Python `3.11+`
-- 推荐系统：Linux / macOS / WSL
-- 可选：Docker 与 Docker Compose
+## 核心卖点
 
-安装依赖：
+- 一次上传，完整处理：支持 `PDF / EPUB / TXT`。
+- 双策略过滤：
+  - 专业阅读模式（黑名单）用于剔除常见词；
+  - 雅思备考模式（白名单）用于对齐考试词表与等级。
+- 可配置多模型：OpenAI 官方、OpenAI 兼容、OpenAI Responses、Gemini、Ollama 本地。
+- 稳定性优先：断点续跑、失败重试、并发池控制与熔断保护。
+- 结果可直接用：导出 `Excel / PDF / TXT 单词本`，并生成 Typing-World 词表。
+
+## For Portainer/Synology Users
+
+Copy this into Portainer stacks and hit Deploy. Done.
+
+## Docker Compose
+
+```yaml
+services:
+  ai_words_scaner:
+    image: leduchuong/ai_words_scaner:latest
+    container_name: ai_words_scaner
+    restart: unless-stopped
+    ports:
+      - "1016:7860"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["python", "app.py"]
+```
+
+## 快速开始
+
+### Docker 一条命令
+
+```bash
+docker run --rm -it \
+  -p 1016:7860 \
+  --add-host host.docker.internal:host-gateway \
+  leduchuong/ai_words_scaner:latest
+```
+
+启动后访问：`http://<你的主机IP>:1016`
+
+### 源码运行
 
 ```bash
 pip install -r requirements.txt
-```
-
-## 2. 配置模型（首次必做）
-
-编辑 `llm_settings.json`：
-
-- 填写你自己的 `base_url`
-- 填写你自己的 `api_key`
-- 选择默认 `provider` 与 `model`
-
-说明：仓库中的配置文件已做脱敏处理，不包含任何真实密钥。
-
-## 3. 启动方式
-
-### 方式 A：本地 Python
-
-```bash
 python3 app.py
 ```
 
-默认监听：`0.0.0.0:7860`
+## 典型使用流程
 
-### 方式 B：Docker Compose
+1. 进入“模型配置中心”，添加 Provider、拉取模型并设置默认模型。
+2. 回到“任务看板”，上传电子书文件（PDF/EPUB/TXT）。
+3. 选择过滤策略（专业阅读 / 雅思白名单）与导出格式。
+4. 点击“启动任务”，等待处理完成后下载结果。
 
-```bash
-docker compose up --build
-```
+## 模型与配置能力
 
-默认映射端口：`1016 -> 7860`
+- 支持 Provider 的新增、编辑、删除与默认模型切换。
+- 支持在线拉取模型列表（OpenAI 兼容接口 / Gemini / Ollama）。
+- `llm_settings.json` 已按可公开模板组织，默认不包含真实密钥。
 
-## 4. 使用流程
+## 稳定性设计（实用向）
 
-1. 在“模型配置中心”测试并保存可用模型
-2. 在“任务看板”上传 `PDF / EPUB / TXT`
-3. 选择过滤策略与导出格式
-4. 启动任务并下载结果文件
+- 断点续跑：使用 `cache_results.jsonl` 记录进度，重复任务可命中已处理结果。
+- 并发执行：异步并发池（Semaphore）提升吞吐。
+- 故障恢复：对临时错误重试，对连续严重错误熔断终止，避免无效刷接口。
 
-## 5. 输入与输出
+## 输出结果
 
-### 输入
+- `vocabulary_reading.xlsx`：结构化词表（含词性、语境释义、搭配等）。
+- `vocabulary_reading.pdf`：便于打印或离线阅读。
+- `maimemo_vocabulary.txt`：可用于单词本导入。
+- `typing_world.csv`：Typing-World 练习词表。
 
-- 电子书文件：`PDF / EPUB / TXT`
-- 可选自定义词库：
-  - `word,level` 两列时按白名单处理
-  - 文件名含 `black` 时按黑名单处理
+## Profile Style Metrics
 
-### 产出（运行后生成）
+<p align="left"><img src="https://komarev.com/ghpvc/?username=leduchuong48-byte&label=Repo%20views&color=0e75b6&style=flat" alt="views" /></p>
 
-- `cache_results.jsonl`（断点与缓存）
-- `run_trace.log`（运行日志）
-- `typing_world.csv`
-- `maimemo_vocabulary.txt`
-- `vocabulary_reading.xlsx`
-- `vocabulary_reading.pdf`
+<p>
+  <img align="left" src="https://github-readme-stats.vercel.app/api/top-langs?username=leduchuong48-byte&show_icons=true&locale=en&layout=compact" alt="top-langs" />
+  <img align="center" src="https://github-readme-stats.vercel.app/api?username=leduchuong48-byte&show_icons=true&locale=en" alt="stats" />
+</p>
 
-以上文件属于运行产物，默认已在 `.gitignore` 中排除。
+<p><img align="center" src="https://github-readme-streak-stats.herokuapp.com/?user=leduchuong48-byte" alt="streak" /></p>
 
-## 6. 隐私与安全
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=leduchuong48-byte/ai_words_scaner&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=leduchuong48-byte/ai_words_scaner&type=Date" />
+  <img alt="Star History" src="https://api.star-history.com/svg?repos=leduchuong48-byte/ai_words_scaner&type=Date" />
+</picture>
 
-- 不要提交真实 `API Key`
-- 不要提交包含个人或受限内容的输入文档与导出结果
-- 建议把本地敏感配置写入 `llm_settings.local.json` 或 `.env`（并保持忽略）
+## License
 
-## 7. 目录结构
+MIT，详见 [LICENSE](LICENSE)。
 
-```text
-.
-├── app.py
-├── extractor_core.py
-├── llm_processor.py
-├── config_manager.py
-├── dicts/
-├── llm_settings.json
-├── llm_settings.example.json
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-├── .gitignore
-└── README.md
-```
-
-## 8. 仓库维护建议
-
-- 提交前执行一次敏感信息扫描（密钥、令牌、私有 URL、个人数据）
-- 单文件超过 GitHub 限制时，改用 Git LFS 或外部对象存储
-- 持续保持 `README.md` 与实际功能一致
-
-## 9. 免责声明
+## Disclaimer
 
 使用本项目即表示你已阅读并同意 [免责声明](DISCLAIMER.md)。
