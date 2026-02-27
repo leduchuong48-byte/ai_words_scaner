@@ -95,8 +95,8 @@ python3 app.py
 <p align="left"><img src="https://komarev.com/ghpvc/?username=leduchuong48-byte&label=Repo%20views&color=0e75b6&style=flat" alt="views" /></p>
 
 <p>
-  <img align="left" src="https://github-readme-stats.vercel.app/api/top-langs?username=leduchuong48-byte&show_icons=true&locale=en&layout=compact" alt="top-langs" />
-  <img align="center" src="https://github-readme-stats.vercel.app/api?username=leduchuong48-byte&show_icons=true&locale=en" alt="stats" />
+  <img align="left" src="https://github-readme-stats-sigma-five.vercel.app/api/top-langs?username=leduchuong48-byte&show_icons=true&locale=en&layout=compact" alt="top-langs" />
+  <img align="center" src="https://github-readme-stats-sigma-five.vercel.app/api?username=leduchuong48-byte&show_icons=true&locale=en" alt="stats" />
 </p>
 
 <p><img align="center" src="https://github-readme-streak-stats.herokuapp.com/?user=leduchuong48-byte" alt="streak" /></p>
