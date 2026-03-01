@@ -11,6 +11,10 @@
 
 A practical AI pipeline for English reading vocabulary: upload `PDF/EPUB/TXT`, extract candidate words, enrich them with LLM contextual meanings and collocations, then export review-ready outputs.
 
+## Release Notes
+
+- `v1.1.0`: Fixed PDF font rendering issues and export layout problems for more stable cross-environment output.
+
 ## Why this tool
 
 Most vocabulary workflows are fragmented: extraction, filtering, explanation, collocation lookup, and export all happen in different tools. `ai_words_scaner` unifies this into one repeatable WebUI flow.

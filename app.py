@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import re
 from datetime import datetime
 from html import escape
@@ -33,6 +34,9 @@ BUILTIN_DICT_DIR = Path("dicts")
 BUILTIN_IELTS_CSV = BUILTIN_DICT_DIR / "ielts_words.csv"
 BUILTIN_BLACKLIST_CSV = BUILTIN_DICT_DIR / "common_blacklist.csv"
 CONFIG_MANAGER = LLMConfigManager(SETTINGS_PATH)
+APP_NAME = (os.getenv("APP_NAME", "Ai Words Scaner") or "Ai Words Scaner").strip()
+APP_VERSION = (os.getenv("APP_VERSION", "1.1") or "1.1").strip()
+APP_TITLE = f"{APP_NAME} v{APP_VERSION}"
 
 
 def ensure_builtin_dict_assets() -> None:
@@ -217,12 +221,12 @@ def _generate_pdf(
     color_theme: str,
     page_orientation: str,
 ) -> None:
-    """使用 ReportLab 生成 PDF（A4，方向可配置，中文可读，强清洗）。"""
+    """使用 ReportLab 生成 PDF（A4，方向可配置，强制使用可嵌入字体）。"""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 
     def _sanitize_pdf_text(value: Any) -> str:
@@ -241,18 +245,40 @@ def _generate_pdf(
         text = escape(text, quote=False)
         return text.replace("\n", "<br/>")
 
-    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+    def _select_pdf_fonts() -> Tuple[str, str]:
+        managed_font_name = "AiWordsScanerManagedPdfFont"
+        if managed_font_name in pdfmetrics.getRegisteredFontNames():
+            return managed_font_name, managed_font_name
+
+        managed_font_paths = [
+            # 项目内置字体（若存在，优先使用）
+            Path("assets/fonts/DroidSansFallbackFull.ttf"),
+            # 容器/系统字体（由 Dockerfile 固定安装）
+            Path("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"),
+        ]
+        for font_path in managed_font_paths:
+            if not font_path.exists():
+                continue
+            pdfmetrics.registerFont(TTFont(managed_font_name, str(font_path)))
+            return managed_font_name, managed_font_name
+
+        raise RuntimeError(
+            "缺少受管 PDF 字体: DroidSansFallbackFull.ttf。"
+            "请在容器中安装 fonts-droid-fallback，或将字体放到 assets/fonts/。"
+        )
+
+    body_font_name, header_font_name = _select_pdf_fonts()
 
     body_style = ParagraphStyle(
         "Body",
-        fontName="STSong-Light",
+        fontName=body_font_name,
         fontSize=10,
         leading=13,
         wordWrap="CJK",
     )
     header_style = ParagraphStyle(
         "Header",
-        fontName="STSong-Light",
+        fontName=header_font_name,
         fontSize=12,
         leading=14,
         alignment=1,  # center
@@ -298,9 +324,7 @@ def _generate_pdf(
 
     # 构建表格数据
     data: List[List[Paragraph]] = []
-    data.append(
-        [Paragraph(f"<b>{_sanitize_pdf_text(h)}</b>", header_style) for h in headers]
-    )
+    data.append([Paragraph(_sanitize_pdf_text(h), header_style) for h in headers])
     for row in excel_df.itertuples(index=False):
         cleaned_row: List[Paragraph] = []
         for cell in row:
@@ -323,7 +347,8 @@ def _generate_pdf(
     table = Table(data, colWidths=col_widths, repeatRows=1)
 
     style_cmds = [
-        ("FONTNAME", (0, 0), (-1, -1), "STSong-Light"),
+        ("FONTNAME", (0, 0), (-1, 0), header_font_name),
+        ("FONTNAME", (0, 1), (-1, -1), body_font_name),
         ("FONTSIZE", (0, 0), (-1, 0), 12),
         ("FONTSIZE", (0, 1), (-1, -1), 10),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -869,7 +894,8 @@ def on_save_provider(
     )
 
 
-with gr.Blocks(title="Vocabulary Pipeline") as demo:
+with gr.Blocks(title=APP_TITLE) as demo:
+    gr.Markdown(f"# {APP_NAME}\n\n版本：`{APP_VERSION}`")
     with gr.Tabs():
         with gr.Tab("任务看板"):
             with gr.Row():

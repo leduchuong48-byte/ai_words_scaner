@@ -1,8 +1,22 @@
 FROM python:3.11-slim
 
+ARG APP_NAME="Ai Words Scaner"
+ARG APP_VERSION="1.1"
+
+LABEL org.opencontainers.image.title="${APP_NAME}" \
+      org.opencontainers.image.version="${APP_VERSION}"
+
+ENV APP_NAME="${APP_NAME}" \
+    APP_VERSION="${APP_VERSION}"
+
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fontconfig \
+    fonts-droid-fallback \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
